@@ -11,21 +11,24 @@ type DAWG struct {
 	DFA []map[rune]int32 // 決定性有限オートマトン
 }
 
-func (d *DAWG) skipPrefix(prefix string) int32 {
-	var idx int32 = 0
-	for _, c := range prefix {
+func (d *DAWG) skipPrefix(prefix string, partial bool) (idx int32, count int) {
+	for i, c := range prefix {
 		node := d.DFA[idx]
 		if idxTo, ok := node[c]; ok && idxTo >= 0 {
 			idx = idxTo
 		} else {
-			return -1
+			if partial {
+				return idx, i
+			} else {
+				return -1, i
+			}
 		}
 	}
-	return idx
+	return idx, len(prefix)
 }
 
 func (d *DAWG) Contains(word string) bool {
-	if idx := d.skipPrefix(word); idx >= 0 {
+	if idx, _ := d.skipPrefix(word, false); idx >= 0 {
 		_, ok := d.DFA[idx][-1]
 		return ok
 	}
@@ -33,11 +36,12 @@ func (d *DAWG) Contains(word string) bool {
 }
 
 func (d *DAWG) ContainsPrefix(word string) bool {
-	return d.skipPrefix(word) != -1
+	idx, _ := d.skipPrefix(word, false)
+	return idx != -1
 }
 
-func (d *DAWG) StartsWith(prefix string, maxSize int) []string {
-	idx := d.skipPrefix(prefix)
+func (d *DAWG) StartsWith(prefix string, partial bool, maxSize int) []string {
+	idx, count := d.skipPrefix(prefix, partial)
 	if idx < 0 {
 		return nil
 	}
@@ -55,7 +59,7 @@ func (d *DAWG) StartsWith(prefix string, maxSize int) []string {
 		stack = stack[1:]
 
 		if _, ok := top.node[-1]; ok {
-			results = append(results, prefix+top.s)
+			results = append(results, prefix[:count]+top.s)
 			if maxSize > 0 && len(results) > maxSize {
 				break
 			}
